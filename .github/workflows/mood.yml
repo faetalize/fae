@@ -15,7 +15,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: node src/pick_mood.mjs
         env:
-          # the default token only sees public work. PROFILE_TOKEN, if set, counts private work too.
+          # the default token only counts private work if the profile shares private contributions.
+          # PROFILE_TOKEN is the fallback for profiles that don't: a token with the read:user scope.
           GITHUB_TOKEN: ${{ secrets.PROFILE_TOKEN || secrets.GITHUB_TOKEN }}
       # a single force-pushed commit on its own branch, so the count changing every 30 minutes never adds
       # to main's history. her licence travels with the image.
