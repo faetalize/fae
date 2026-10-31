@@ -2,13 +2,11 @@
 //render the dark pixel-art blob fairy as a transparent svg.
 //usage: render.mjs awake|frantic|asleep|faces output [freeze_seconds]
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const [mood, output, freezeArg] = process.argv.slice(2);
-//an optional third argument pauses the loop at that second, for checking single frames.
-const FREEZE = Number(freezeArg ?? 0);
-//FAIRY_COUNT is the contribution count her speech bubble reads out.
-const COUNT = process.env.FAIRY_COUNT;
-const counted = COUNT && `${COUNT} contrib${COUNT === "1" ? "" : "s"} today!`;
+//set by render() for each image: the second her loop is paused at, and what her speech bubble says.
+let freeze;
+let counted;
 const WIDTH = 830;
 const HEIGHT = 90;
 const PX = 3;
@@ -199,14 +197,14 @@ function flying(face, loop, flap, bob, every, life, stops, { hit, shaken, notice
     const py = Math.round(y + 10 * PX + Math.sin(angle) * 9.5 * PX);
     trail +=
       `<use href="#${i % 3 ? "g" : "r"}" class="t" x="${px}" y="${py}" ` +
-      `style="animation-delay:${(at - loop - FREEZE).toFixed(2)}s"/>`;
+      `style="animation-delay:${(at - loop - freeze).toFixed(2)}s"/>`;
   }
   const [, wallY] = positionAt(stops, hit);
   for (let i = 0; i < 7; i++) {
     const at = (hit / 100) * loop;
     trail +=
       `<use href="#${i % 2 ? "g" : "r"}" class="t" x="${WIDTH - 20 - i * 10}" y="${Math.round(wallY) + (i % 2 ? -6 - i : 60 + i)}" ` +
-      `style="animation-delay:${(at - loop - FREEZE).toFixed(2)}s"/>`;
+      `style="animation-delay:${(at - loop - freeze).toFixed(2)}s"/>`;
   }
 
   const step = (0.25 / loop) * 100;
@@ -234,7 +232,7 @@ function flying(face, loop, flap, bob, every, life, stops, { hit, shaken, notice
   const [noticeX, noticeY] = positionAt(stops, notice[0]);
   const speech = bubble(says, Math.round(noticeX) + SPRITE_W * PX + 2, Math.round(noticeY) + 8, timeline([smile]));
 
-  const delay = `animation-delay:-${FREEZE}s`;
+  const delay = `animation-delay:-${freeze}s`;
   const lifePercent = ((life / loop) * 100).toFixed(2);
   const style =
     `@keyframes path{${path}}.p{animation:path ${loop}s ease-in-out infinite;${delay}}` +
@@ -350,10 +348,26 @@ const scenes = {
   faces: closeUps,
 };
 
-const { style, art } = scenes[mood]();
-writeFileSync(
-  output,
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" ` +
-    `height="${HEIGHT}" shape-rendering="crispEdges" role="img" aria-label="A tiny dark fairy">` +
-    `<style>${style}${freezeArg ? "*{animation-play-state:paused!important}" : ""}@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>${art}</svg>`,
-);
+//the notice sits inside the svg so her licence stays with every copy of the file.
+const NOTICE = "<!-- fæ is not open source. FaeCL-1.0: https://github.com/faetalize/fae/blob/main/LICENSE-ART -->";
+
+export function render(mood, { count, freezeAt } = {}) {
+  //function instances serve many requests, so one image's keyframes can't be left for the next.
+  moments.length = 0;
+  freeze = freezeAt ?? 0;
+  counted = count && `${count} contrib${count === "1" ? "" : "s"} today!`;
+  const { style, art } = scenes[mood]();
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" ` +
+    `height="${HEIGHT}" shape-rendering="crispEdges" role="img" aria-label="A tiny dark fairy">${NOTICE}` +
+    `<style>${style}${freezeAt === undefined ? "" : "*{animation-play-state:paused!important}"}@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>${art}</svg>`
+  );
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [mood, output, freezeArg] = process.argv.slice(2);
+  //an optional third argument pauses the loop at that second, for checking single frames.
+  //FAIRY_COUNT is the contribution count her speech bubble reads out.
+  const freezeAt = freezeArg ? Number(freezeArg) : undefined;
+  writeFileSync(output, render(mood, { count: process.env.FAIRY_COUNT, freezeAt }));
+}
