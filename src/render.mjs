@@ -281,7 +281,7 @@ function sleeping() {
   return { style, art: frame("a", [3, 4, 5]) + frame("c", [3, 4]) + zeds };
 }
 
-//each expression at reading size, since the real sprite is only about 120px wide.
+//each expression at reading size, since the real sprite is only about 90px wide.
 function closeUps() {
   const size = 5;
   const art = ["awake", "frantic", "asleep"]
