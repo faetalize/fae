@@ -23,7 +23,7 @@ const {
 
 const SPRITE_W = 31;
 const BODY_X = 7;
-const BODY_Y = 4;
+const BODY_Y = 5;
 
 const pixel = (x, y, ch, size) =>
   `<rect x="${x * size}" y="${y * size}" width="${size}" height="${size}" fill="${COLOURS[ch]}"/>`;
@@ -76,6 +76,18 @@ const zed = [
 ]
   .map(([x, y]) => `<rect x="${x * 3}" y="${y * 3}" width="3" height="3" fill="#9d8bc4"/>`)
   .join("");
+
+//embers circling above her head after she hits the wall, hopping whole sprite pixels like everything else.
+const ORBIT = 0.6;
+const orbit = Array.from({ length: 6 }, (_, i) => {
+  const angle = (i / 6) * 2 * Math.PI;
+  const [x, y] = [Math.cos(angle) * 7, Math.sin(angle) * 2].map(Math.round);
+  return `${((i / 6) * 100).toFixed(2)}%{transform:translate(${x * PX}px,${y * PX}px)}`;
+}).join("");
+
+//her spiral eyes turn a quarter at a time, the only angle where a pixel block lands back on the grid.
+const SPIN = 0.48;
+const quarters = [0, 1, 2, 3].map((i) => `${i * 25}%{transform:rotate(${i * 90}deg)}`).join("");
 
 //css easing curves, solved for progress at time u, so an ember lands exactly where she is.
 //"in" has no slowdown at the end, which is what lets her hit the wall instead of parking at it.
@@ -223,9 +235,18 @@ function flying(face, loop, flap, bob, every, life, stops, { hit, shaken, notice
     `${pct(hit + step * 2)}%{transform:translateX(-${PX}px)}${pct(hit + step * 3)}%{transform:translateX(${PX}px)}` +
     `${pct(hit + step * 4)}%{transform:translateX(-${PX}px)}${pct(hit + step * 5)}%{transform:none}100%{transform:none}`;
 
+  const stars = [0, 1, 2]
+    .map((i) => `<use href="#g" class="s" x="${14 * PX}" y="${PX}" style="animation-delay:${(-freeze - (i * ORBIT) / 3).toFixed(2)}s"/>`)
+    .join("");
+
+  const spiral = (centre) =>
+    `<g class="e" style="transform-origin:${(centre + BODY_X) * PX}px ${(6.5 + BODY_Y) * PX}px">` +
+    `${overlay(FACES.dizzy.filter(([x, , ch]) => ch === "E" && Math.abs(x - centre) < 3))}</g>`;
+  const dizzy = spiral(4.5) + spiral(12.5) + overlay(FACES.dizzy.filter(([, , ch]) => ch !== "E"));
+
   const faceLayers =
     `<g ${timeline([[hit, shaken], blink, smile], 1)}><g class="l">${overlay(face)}</g></g>` +
-    `<g ${timeline([[hit, shaken]])}>${overlay(FACES.frantic)}</g>` +
+    `<g ${timeline([[hit, shaken]])}>${dizzy}${stars}</g>` +
     `<g ${timeline([blink])}>${overlay(FACES.asleep)}</g>` +
     `<g ${timeline([smile])}>${overlay(FACES.happy)}</g>`;
 
@@ -246,6 +267,8 @@ function flying(face, loop, flap, bob, every, life, stops, { hit, shaken, notice
     `.m{animation-duration:${loop}s;animation-iteration-count:infinite;animation-timing-function:step-end;${delay}}` +
     `.l{animation:look ${loop}s step-end infinite;${delay}}@keyframes look{${look}}` +
     `.j{transform-origin:${SPRITE_W * PX}px ${12 * PX}px;animation:act ${loop}s step-end infinite;${delay}}@keyframes act{${act}}` +
+    `.s{animation:orbit ${ORBIT}s step-end infinite}@keyframes orbit{${orbit}}` +
+    `.e{animation:spin ${SPIN}s step-end infinite;${delay}}@keyframes spin{${quarters}}` +
     moments.join("");
   const defs = `<defs><g id="g">${ember("#b8902f")}</g><g id="r">${ember("#b3202a")}</g></defs>`;
   const art =
@@ -276,7 +299,7 @@ function sleeping() {
         `<g class="z" style="animation-delay:${delay}s">${zed}</g></g>`,
     )
     .join("");
-  return { style, art: frame("a", [3, 4, 5]) + frame("c", [3, 4]) + zeds };
+  return { style, art: frame("a", [3]) + frame("c", []) + zeds };
 }
 
 //each expression at reading size, since the real sprite is only about 90px wide.
@@ -284,7 +307,7 @@ function closeUps() {
   const size = 5;
   const art = ["awake", "frantic", "asleep"]
     .map((name, i) => {
-      const wing = name === "asleep" ? wings(WING.folded, 7, size) : wings(WING.up, WING.upY, size);
+      const wing = name === "asleep" ? wings(WING.folded, BODY_Y + 4, size) : wings(WING.up, WING.upY, size);
       return `<g transform="translate(${50 + i * 260} 10)">${wing}${body(FACES[name], [], BODY_Y, size)}</g>`;
     })
     .join("");
@@ -302,19 +325,19 @@ const scenes = {
       1,
       [
         [0, 20, 6],
-        [8, 300, 0, "in"],
-        [16, 737, 14],
-        [19, 737, 14],
-        [23, 640, 8],
-        [34, 320, 20],
-        [40, 320, 20],
-        [48, 320, 20],
+        [8, 320, 20],
+        [16, 320, 20, "in"],
+        [24, 737, 14],
+        [27, 737, 14],
+        [31, 640, 8],
+        [42, 320, 20],
         [60, 560, 2],
         [74, 700, 22],
         [86, 210, 2],
         [100, 20, 6],
       ],
-      { hit: 16, shaken: 20, notice: [40, 48], says: counted ?? "hi!" },
+      //she stops to speak a few seconds in, since most visitors won't stay for a 60 second loop.
+      { hit: 24, shaken: 28, notice: [8, 16], says: counted ?? "hi!" },
     ),
   frantic: () =>
     flying(
